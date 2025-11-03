@@ -2,34 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
-/**
- * LoginByOtp - Tailwind styled OTP login component
- * Put this in: src/app/login/page.jsx  (or app/login/page.jsx)
- *
- * Requirements: Tailwind CSS configured in project.
- */
+import Link from "next/link";
 
 export default function LoginByOtp() {
-  const [step, setStep] = useState(1); // 1: request email, 2: enter otp
+  const [step, setStep] = useState(1);
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
-  const [msg, setMsg] = useState(null); // { type: "error" | "success" | "info", text: string }
+  const [msg, setMsg] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [resendTimer, setResendTimer] = useState(0); // seconds left for resend
+  const [resendTimer, setResendTimer] = useState(0);
   const router = useRouter();
 
-  // Countdown effect for resendTimer
   useEffect(() => {
     if (resendTimer <= 0) return;
     const t = setInterval(() => setResendTimer((s) => s - 1), 1000);
     return () => clearInterval(t);
   }, [resendTimer]);
 
-  // Helper: simple email validation
-  const isValidEmail = (e) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
-  };
+  const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
   function showMessage(type, text, autoClear = true) {
     setMsg({ type, text });
@@ -38,6 +28,25 @@ export default function LoginByOtp() {
     }
   }
 
+  // ========== NEW: Generate avatar URL from email ==========
+  async function generateAvatarURL(email) {
+    const trimmedEmail = email.trim().toLowerCase();
+    
+    // Simple hash function (MD5 alternative using Web Crypto API)
+    const encoder = new TextEncoder();
+    const data = encoder.encode(trimmedEmail);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    
+    // Use first 32 chars (MD5 length equivalent)
+    const hash = hashHex.substring(0, 32);
+    
+    // Gravatar URL with fallback to identicon
+    return `https://www.gravatar.com/avatar/${hash}?d=identicon&s=200`;
+  }
+
+  // ========== MODIFIED: Request OTP + Save Avatar ==========
   async function requestOtp(e) {
     e.preventDefault();
     setMsg(null);
@@ -58,8 +67,14 @@ export default function LoginByOtp() {
 
       if (res.ok) {
         showMessage("success", "OTP sent — check your inbox (and spam).");
+        
+        // ========== NEW: Generate and save avatar URL ==========
+        const avatarURL = await generateAvatarURL(email);
+        sessionStorage.setItem('userEmail', email.trim().toLowerCase());
+        sessionStorage.setItem('userAvatar', avatarURL);
+        
         setStep(2);
-        setResendTimer(60); // 60s before resend allowed
+        setResendTimer(60);
       } else {
         showMessage("error", data?.message || "Could not send OTP. Try again later.");
       }
@@ -74,8 +89,8 @@ export default function LoginByOtp() {
     e.preventDefault();
     setMsg(null);
 
-    if (!otp || otp.trim().length < 4) {
-      showMessage("error", "Enter the OTP you received in email.");
+    if (!otp || otp.trim().length < 6) {
+      showMessage("error", "Enter the 6-digit OTP you received in email.");
       return;
     }
 
@@ -90,8 +105,7 @@ export default function LoginByOtp() {
 
       if (res.ok) {
         showMessage("success", "Logged in — redirecting...");
-        // short delay so user sees the message
-        setTimeout(() => router.push("/dashboard"), 900);
+        setTimeout(() => router.push("/dashboard"), 700);
       } else {
         showMessage("error", data?.message || "Invalid or expired OTP.");
       }
@@ -126,7 +140,6 @@ export default function LoginByOtp() {
     }
   }
 
-  // Small presentational components
   const IconSpinner = () => (
     <svg
       className="animate-spin h-4 w-4 text-white inline-block -mt-0.5"
@@ -141,28 +154,29 @@ export default function LoginByOtp() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white flex items-center justify-center py-16 px-4">
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center py-16 px-4">
       <div className="w-full max-w-md">
-        <div className="bg-white/90 backdrop-blur-md border border-gray-200 rounded-2xl shadow-xl overflow-hidden">
+        <div className="bg-gray-800/80 backdrop-blur-lg border border-gray-700/50 rounded-2xl shadow-2xl overflow-hidden">
           <div className="px-6 py-8">
             <div className="flex items-center gap-3">
-              <div className="bg-gradient-to-tr from-sky-500 to-indigo-500 text-white rounded-xl p-2 shadow">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+              <div className="bg-gradient-to-tr from-teal-400 to-sky-500 text-gray-900 rounded-xl p-2 shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                   <path d="M2 5a2 2 0 012-2h8a2 2 0 012 2v1h2a1 1 0 011 1v6a2 2 0 01-2 2H6a2 2 0 01-2-2V6a1 1 0 011-1h-1z" />
                   <path d="M7 9h6v2H7V9z" />
                 </svg>
               </div>
               <div>
-                <h1 className="text-2xl font-semibold text-slate-800">Sign in with Email OTP</h1>
-                <p className="text-sm text-slate-500">Fast, passwordless sign in — secure & simple.</p>
+                <h1 className="text-2xl font-semibold text-white">Sign in to Cling Reminder</h1>
+                <p className="text-sm text-gray-400">Fast, passwordless sign in — secure & simple.</p>
               </div>
             </div>
 
-            {/* messages */}
             {msg && (
               <div
                 className={`mt-6 p-3 rounded-md text-sm ${
-                  msg.type === "error" ? "bg-rose-50 text-rose-700 border border-rose-100" : "bg-emerald-50 text-emerald-800 border border-emerald-100"
+                  msg.type === "error"
+                    ? "bg-rose-900/40 text-rose-300 border border-rose-800"
+                    : "bg-emerald-900/40 text-emerald-300 border border-emerald-800"
                 }`}
                 role="status"
                 aria-live="polite"
@@ -171,11 +185,10 @@ export default function LoginByOtp() {
               </div>
             )}
 
-            {/* Form body */}
             <div className="mt-6">
               {step === 1 && (
                 <form onSubmit={requestOtp} className="space-y-4">
-                  <label className="block text-sm font-medium text-slate-700">Email address</label>
+                  <label className="block text-sm font-medium text-gray-300">Email address</label>
                   <input
                     type="email"
                     inputMode="email"
@@ -183,17 +196,17 @@ export default function LoginByOtp() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
                     required
-                    className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent transition"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-600 bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-transparent transition"
                     aria-label="Email address"
                   />
 
                   <button
                     type="submit"
                     disabled={loading || !isValidEmail(email)}
-                    className={`w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-white font-medium transition ${
+                    className={`w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-gray-900 font-semibold transition active:scale-95 ${
                       loading || !isValidEmail(email)
-                        ? "bg-slate-300 cursor-not-allowed"
-                        : "bg-sky-600 hover:bg-sky-700 active:scale-95"
+                        ? "bg-gray-600/50 text-gray-400 cursor-not-allowed"
+                        : "bg-gradient-to-r from-teal-400 to-sky-500 hover:from-teal-300 hover:to-sky-400 shadow-md hover:shadow-lg"
                     }`}
                     aria-disabled={loading || !isValidEmail(email)}
                   >
@@ -206,7 +219,7 @@ export default function LoginByOtp() {
                     )}
                   </button>
 
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-gray-500">
                     We will email you a one-time 6-digit code. It expires in <strong>10 minutes</strong>.
                   </p>
                 </form>
@@ -214,8 +227,8 @@ export default function LoginByOtp() {
 
               {step === 2 && (
                 <form onSubmit={verifyOtp} className="space-y-4">
-                  <div className="text-sm text-slate-600">
-                    Enter the 6-digit code we sent to <span className="font-medium text-slate-800">{email}</span>
+                  <div className="text-sm text-gray-400">
+                    Enter the 6-digit code we sent to <span className="font-medium text-white">{email}</span>
                   </div>
 
                   <input
@@ -227,18 +240,20 @@ export default function LoginByOtp() {
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
                     placeholder="123456"
                     required
-                    className="w-full text-center tracking-widest text-lg font-medium px-4 py-3 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200 transition"
+                    className="w-full text-center tracking-widest text-lg font-medium px-4 py-3 rounded-lg border border-gray-600 bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-teal-400 transition"
                     aria-label="One time password"
                   />
 
                   <div className="flex items-center justify-between gap-3">
                     <button
                       type="submit"
-                      disabled={loading || otp.length < 4}
-                      className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-white font-medium transition ${
-                        loading || otp.length < 4 ? "bg-slate-300 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700 active:scale-95"
+                      disabled={loading || otp.length < 6}
+                      className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-gray-900 font-semibold transition active:scale-95 ${
+                        loading || otp.length < 6
+                          ? "bg-gray-600/50 text-gray-400 cursor-not-allowed"
+                          : "bg-gradient-to-r from-teal-400 to-sky-500 hover:from-teal-300 hover:to-sky-400 shadow-md hover:shadow-lg"
                       }`}
-                      aria-disabled={loading || otp.length < 4}
+                      aria-disabled={loading || otp.length < 6}
                     >
                       {loading ? (
                         <>
@@ -256,22 +271,20 @@ export default function LoginByOtp() {
                         setOtp("");
                         setMsg(null);
                       }}
-                      className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-sm text-slate-700 hover:bg-slate-50"
+                      className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-gray-600 text-sm text-gray-300 hover:bg-gray-700/50 transition"
                     >
                       Change email
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between text-sm text-slate-500">
-                    <div>
-                      Didn’t receive it?
-                    </div>
+                  <div className="flex items-center justify-between text-sm text-gray-500">
+                    <div>Didn't receive it?</div>
                     <div>
                       <button
                         type="button"
                         onClick={handleResend}
                         disabled={resendTimer > 0 || loading}
-                        className={`text-sm font-medium ${resendTimer > 0 || loading ? "text-slate-300" : "text-sky-600 hover:underline"}`}
+                        className={`text-sm font-medium ${resendTimer > 0 || loading ? "text-gray-600" : "text-teal-400 hover:underline"}`}
                         aria-disabled={resendTimer > 0 || loading}
                       >
                         {resendTimer > 0 ? `Resend in ${resendTimer}s` : "Resend OTP"}
@@ -283,24 +296,28 @@ export default function LoginByOtp() {
             </div>
           </div>
 
-          <div className="px-6 py-4 bg-gradient-to-t from-white/50 via-transparent to-transparent border-t border-gray-100 text-xs text-slate-400">
-            By continuing you agree to our <span className="text-sky-600">Terms</span> & <span className="text-sky-600">Privacy</span>.
+          <div className="px-6 py-4 bg-gray-900/50 border-t border-gray-700 text-xs text-gray-500">
+            By continuing you agree to our <span className="text-teal-400 hover:text-sky-400">Terms</span> &{" "}
+            <span className="text-teal-400 hover:text-sky-400">Privacy</span>.
           </div>
         </div>
 
-        <div className="mt-6 text-center text-sm text-slate-500">
+        <div className="mt-6 text-center text-sm text-gray-400 space-x-4">
+          <Link href="/" className="underline text-gray-500 hover:text-gray-300 transition">
+            &larr; Back to Home
+          </Link>
+
           <button
             type="button"
             onClick={() => {
-              // quick dev helper: clear cookie by visiting /api/logout if exists, or just clear UI
               setEmail("");
               setOtp("");
               setStep(1);
               setMsg(null);
             }}
-            className="underline text-slate-400 hover:text-slate-600"
+            className="underline text-gray-500 hover:text-gray-300 transition"
           >
-            Start over
+            Start over / Reset
           </button>
         </div>
       </div>
