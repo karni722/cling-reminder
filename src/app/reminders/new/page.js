@@ -25,6 +25,12 @@ export default function NewReminderPage() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [toast, setToast] = useState(null); // { type: 'error'|'success', text: string }
+
+  function showToast(type, text, durationMs = 4000) {
+    setToast({ type, text });
+    if (durationMs > 0) setTimeout(() => setToast(null), durationMs);
+  }
 
   const AUTH_KEYS = ["auth_token", "token", "user"]; // adapt if your app uses different keys
 
@@ -42,25 +48,21 @@ export default function NewReminderPage() {
     setFormData(prev => ({ ...prev, icon_image_url: "" })); // Clear selected image
 
     try {
-      // Calling the new backend API route
-      const response = await fetch('/api/ai/generate-images', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description }) // Description ko prompt bana kar bhej rahe hain
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        setError(errorData.error || "Failed to get AI suggestions. Check your backend/API Key.");
+      const { generateImage } = await import("@/lib/backendApi");
+      // Ask for approx 10 suggestions
+      const data = await generateImage({ prompt: description, width: 1024, height: 1024, samples: 10, cfg_scale: 7 });
+      const urls = Array.isArray(data?.urls) ? data.urls : [];
+      if (!urls.length) {
+        setError("No image returned from Stability.");
+        showToast('error', 'No image returned from Stability');
         return;
       }
-
-      const data = await response.json();
-      setImageSuggestions(data.urls); // Server se mili URLs ko save kiya
-
+      setImageSuggestions(urls);
     } catch (err) {
       console.error('AI Generation Fetch Error:', err);
-      setError('Could not connect to the AI service.');
+      const msg = (err?.response?.data?.detail?.message) || (err?.response?.data?.error) || err?.message || 'Could not connect to the AI service.';
+      setError(msg);
+      showToast('error', msg);
     } finally {
       setIsGenerating(false);
     }
@@ -73,19 +75,9 @@ export default function NewReminderPage() {
     setError("");
 
     try {
-      // formData mein ab icon_image_url bhi hai, jo automatic JSON mein chala jayega
-      const response = await fetch("/api/reminders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData)
-      });
-
-      if (response.ok) {
-        router.push("/reminders");
-      } else {
-        const data = await response.json();
-        setError(data.message || "Failed to create reminder");
-      }
+      const { createReminder } = await import("@/lib/backendApi");
+      await createReminder(formData);
+      router.push("/reminders");
     } catch (err) {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -138,6 +130,12 @@ export default function NewReminderPage() {
 
   return (
     <main className="min-h-screen bg-gray-900 text-white flex flex-col sm:flex-row">
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg border ${toast.type === 'error' ? 'bg-rose-900/70 border-rose-700 text-rose-100' : 'bg-emerald-900/70 border-emerald-700 text-emerald-100'}`}>
+          {toast.text}
+        </div>
+      )}
       {/* Sidebar (No changes here) */}
       <aside className="w-full sm:w-72 bg-gray-800/60 backdrop-blur-sm border-r border-gray-700/40 p-6 flex flex-col">
         <div>
@@ -255,7 +253,7 @@ export default function NewReminderPage() {
                                           ? 'border-4 border-teal-400 ring-2 ring-teal-600 shadow-lg shadow-teal-500/50' 
                                           : 'border-4 border-transparent hover:border-gray-600'
                                   }`}
-                                  title={url.split('text=')[1].replace(/\+/g, ' ')} // Tooltip for keyword
+                                  title={url && url.includes('text=') ? decodeURIComponent(url.split('text=')[1].replace(/\+/g, ' ')) : 'Generated image'}
                               />
                           ))}
                       </div>

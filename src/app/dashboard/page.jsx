@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
 import UserAvatar from "@/components/UserAvatar";
+import { getUserInfo, getReminders } from "@/lib/backendApi";
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
@@ -11,20 +12,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     setLoading(true);
-    fetch("/api/dashboard/userinfo")
-      .then((res) => {
-        if (!res.ok) throw new Error("Auth fail");
-        return res.json();
-      })
-      .then((data) => {
-        setUser(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setUser(null);
-        setError(err.message);
-        setLoading(false);
-      });
+    getUserInfo()
+      .then((data) => { setUser(data); setLoading(false); })
+      .catch((err) => { setUser(null); setError(err.message); setLoading(false); });
   }, []);
 
   const fmt = (d) => {
@@ -135,12 +125,8 @@ function RecentRemindersClient() {
 
   useEffect(() => {
     setLoading(true);
-    fetch("/api/reminders?limit=6&sort=-createdAt")
-      .then((res) => res.json())
-      .then((res) => {
-        setReminders(res.data || []);
-        setLoading(false);
-      })
+    getReminders({ limit: 6, sort: "-createdAt" })
+      .then((res) => { setReminders(res.data || []); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
