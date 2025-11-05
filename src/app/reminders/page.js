@@ -1,8 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Modal, message } from "antd";
-import "antd/dist/reset.css";
+import { deleteReminder as deleteReminderApi } from "@/lib/backendApi";
 
 export default function RemindersPage() {
   const [user, setUser] = useState(null);
@@ -16,8 +15,8 @@ export default function RemindersPage() {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      fetch("/api/dashboard/userinfo").then((r) => r.ok ? r.json() : null),
-      fetch("/api/reminders").then((r) => r.ok ? r.json() : { data: [] })
+      import("@/lib/backendApi").then(m => m.getUserInfo()).catch(() => null),
+      import("@/lib/backendApi").then(m => m.getReminders()).catch(() => ({ data: [] }))
     ])
       .then(([user, remindersRes]) => {
         setUser(user);
@@ -36,20 +35,13 @@ export default function RemindersPage() {
   };
   const handleDelete = () => {
     if (!toDeleteId) return;
-    fetch(`/api/reminders/${toDeleteId}`, { method: "DELETE" })
-      .then((res) => {
-        if (res.ok) {
-          setReminders(reminders.filter((r) => r._id !== toDeleteId));
-          message.success("Reminder deleted");
-        } else {
-          message.error("Failed to delete reminder");
-        }
+    deleteReminderApi(toDeleteId)
+      .then(() => {
+        setReminders(reminders.filter((r) => r._id !== toDeleteId));
+        alert("Reminder deleted");
       })
-      .catch(() => message.error("Failed to delete reminder"))
-      .finally(() => {
-        setIsModalOpen(false);
-        setToDeleteId(null);
-      });
+      .catch(() => alert("Failed to delete reminder"))
+      .finally(() => { setIsModalOpen(false); setToDeleteId(null); });
   };
 
   const fmt = (d) => {
@@ -150,17 +142,18 @@ export default function RemindersPage() {
           </div>
         )}
       </section>
-      <Modal
-        title="Delete Reminder"
-        open={isModalOpen}
-        onOk={handleDelete}
-        onCancel={() => setIsModalOpen(false)}
-        okText="Delete"
-        okButtonProps={{ danger: true }}
-        cancelText="Cancel"
-      >
-        <p>Are you sure you want to delete this reminder? This action cannot be undone.</p>
-      </Modal>
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-2">Delete Reminder</h3>
+            <p className="text-sm text-gray-300 mb-6">Are you sure you want to delete this reminder? This action cannot be undone.</p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 rounded-lg bg-gray-700 text-gray-200 hover:bg-gray-600">Cancel</button>
+              <button onClick={handleDelete} className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-500">Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

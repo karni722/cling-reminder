@@ -38,11 +38,8 @@ export default function LogoutPage() {
     try {
       // call server logout endpoint if exists (clears httpOnly cookie)
       try {
-        await fetch("/api/logout", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-        });
+        const { api } = await import("@/lib/backendApi");
+        await api.post("/api/logout");
       } catch (e) {
         console.warn("Server logout failed or not available:", e);
       }

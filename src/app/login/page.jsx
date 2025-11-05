@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { sendOtp as sendOtpApi, verifyOtp as verifyOtpApi } from "@/lib/backendApi";
 
 export default function LoginByOtp() {
   const [step, setStep] = useState(1);
@@ -58,14 +59,9 @@ export default function LoginByOtp() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase() }),
-      });
-      const data = await res.json();
-
-      if (res.ok) {
+      const data = await sendOtpApi(email.trim().toLowerCase());
+      
+      if (data) {
         showMessage("success", "OTP sent — check your inbox (and spam).");
         
         // ========== NEW: Generate and save avatar URL ==========
@@ -96,14 +92,9 @@ export default function LoginByOtp() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), otp: otp.trim() }),
-      });
-      const data = await res.json();
+      const data = await verifyOtpApi(email.trim().toLowerCase(), otp.trim());
 
-      if (res.ok) {
+      if (data) {
         showMessage("success", "Logged in — redirecting...");
         setTimeout(() => router.push("/dashboard"), 700);
       } else {
@@ -121,13 +112,8 @@ export default function LoginByOtp() {
     setMsg(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase() }),
-      });
-      const data = await res.json();
-      if (res.ok) {
+      const data = await sendOtpApi(email.trim().toLowerCase());
+      if (data) {
         showMessage("success", "OTP resent. Check your inbox.");
         setResendTimer(60);
       } else {
